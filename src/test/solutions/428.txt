@@ -1,1 +1,0 @@
-Type mismatch in statement: IfStmt(BinExpr(+, BinExpr(-, Id(a), IntegerLit(10)), IntegerLit(1)), BlockStmt([AssignStmt(Id(a), IntegerLit(10))]), BlockStmt([AssignStmt(Id(a), IntegerLit(5))]))

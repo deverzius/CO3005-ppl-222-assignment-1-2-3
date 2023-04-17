@@ -1,5 +1,3 @@
-src/test/solutions/*
-
-src/test/testcases/*
-
-target/*
+/src/test/solutions/*
+/src/test/testcases/*
+/target/*

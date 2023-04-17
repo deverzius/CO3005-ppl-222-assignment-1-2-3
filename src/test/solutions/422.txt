@@ -1,1 +1,0 @@
-Type mismatch in expression: ArrayCell(arr, [FloatLit(3.2)])

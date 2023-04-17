@@ -1,7 +1,0 @@
-
-		a: integer;
-		b: function integer (x: integer) {
-			return x;
-		}
-		c: boolean;
-		

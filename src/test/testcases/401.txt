@@ -1,6 +1,0 @@
-
-            main: function void() {
-                x: integer = 100;
-                x: float = 1.1;
-            }
-        

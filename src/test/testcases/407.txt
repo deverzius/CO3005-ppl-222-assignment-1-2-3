@@ -1,9 +1,0 @@
-
-            main: function void() {
-                x: integer = foo(1, 1.5);
-            }
-            
-            foo: function integer(x: integer, y: float) {
-                return foo(foo(1, 3.2), 1.4);
-            }
-        

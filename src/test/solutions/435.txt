@@ -1,1 +1,0 @@
-Type mismatch in statement: DoWhileStmt(BinExpr(-, Id(a), IntegerLit(10)), BlockStmt([AssignStmt(Id(a), IntegerLit(10)), VarDecl(b, FloatType, FloatLit(5.5))]))
