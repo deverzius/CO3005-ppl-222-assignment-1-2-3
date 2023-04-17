@@ -1,0 +1,6 @@
+
+		fn: function void (x: integer, x: boolean) {
+			return;
+		}
+				main: function void () {}	
+		

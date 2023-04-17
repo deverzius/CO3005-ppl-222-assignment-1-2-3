@@ -1,0 +1,8 @@
+
+            main: function void() {
+                x: auto = 76234;
+                y: auto = "abc";
+                z: auto = true;
+                t: auto = 3244.e1;
+            }
+        

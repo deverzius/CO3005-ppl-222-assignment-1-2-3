@@ -1,0 +1,4 @@
+main: function void() {
+                x = 5;
+                foo();
+            }

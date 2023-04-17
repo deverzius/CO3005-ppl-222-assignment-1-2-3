@@ -1,0 +1,10 @@
+
+            i2f: function integer(x: float) {
+                return 123;
+            }
+
+            main: function void() {
+                x: integer;
+                y: integer = x + 78 + i2f;
+            }
+        

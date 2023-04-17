@@ -1,0 +1,10 @@
+
+		c: integer;
+	 b: function integer (i : integer) {
+		return i;
+	 }
+	 main: function void () {
+		arr: array[2] of integer;
+		c = b(arr["1"]);
+	 }
+		

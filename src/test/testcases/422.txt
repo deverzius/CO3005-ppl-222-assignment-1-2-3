@@ -1,0 +1,5 @@
+
+            main: function void() {
+                arr: array[10] of integer;
+                arr[3.2] = 5;
+            }

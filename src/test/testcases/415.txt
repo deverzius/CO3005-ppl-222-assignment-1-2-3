@@ -1,0 +1,12 @@
+
+            bar: function integer(inherit x: integer) {
+                return 100;
+            }
+            foo: function void() inherit bar {
+                //super(20);
+                // t: integer = 890;
+            }
+            main: function void() {
+                foo();
+            }
+        

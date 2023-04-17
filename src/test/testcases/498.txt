@@ -1,0 +1,30 @@
+
+		foo: function integer (x: integer) {
+			return x;
+		}
+
+		bar: function integer (x: boolean) {
+			return 1;
+		}
+
+		zar: function integer (x: float) {
+			return 1;
+		}
+
+		a: integer = 5;
+		e: integer = 7;
+		b: auto = 5;
+		d: auto = (a + 16) < (17 + e);
+		f: auto = 5 + 1.1 + a;
+		main: function void () {
+			a = foo(b);
+
+			a = b;
+
+			b = bar(d);
+
+			b = zar(f);
+
+			c = foo(b);
+		}
+		

@@ -1,0 +1,10 @@
+
+		b: auto = {1, 2, 3, 4, 5};
+		a : array[5] of integer = {1, 2, 3, 4, 5.5};
+		
+		foo: function integer (x: integer) {
+
+			return 1;
+		}
+		main: function void () {}
+		

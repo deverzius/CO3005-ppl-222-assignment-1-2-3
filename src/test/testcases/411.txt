@@ -1,0 +1,7 @@
+
+            main: function void() {
+                x: integer;
+                y: integer = x + z;
+            }
+            z: integer = 190;
+        

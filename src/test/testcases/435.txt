@@ -1,0 +1,13 @@
+
+		a : integer = 5;
+		foo: function integer (x: integer) {
+		
+			do {
+				a = 10;
+				b : float = 5.5;
+			} while (a - 10);
+
+			return a;
+		}
+		main: function void () {}
+		

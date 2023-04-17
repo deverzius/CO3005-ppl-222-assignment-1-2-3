@@ -1,0 +1,8 @@
+
+		fn: function void (x: integer) {
+			x: integer = 5;
+			return;
+		}
+				main: function void () {}
+
+		

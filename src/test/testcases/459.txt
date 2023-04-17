@@ -1,0 +1,15 @@
+
+		a : integer = 5;
+		b : integer = 10;
+		c : integer = a + b;
+		d : integer = a - b;
+		e : integer = a * b;
+
+		main : function void () {
+			if (a + b)  {
+				a = 10;
+			} else {
+				a = 5;
+			}
+		}
+		

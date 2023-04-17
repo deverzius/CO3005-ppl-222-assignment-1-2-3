@@ -1,0 +1,11 @@
+
+            foo: function integer() {
+            }
+            
+            main: function void() {
+                x: integer = foo();
+            }
+            
+            foo: function integer() {
+            }
+        

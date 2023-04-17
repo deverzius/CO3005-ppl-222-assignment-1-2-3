@@ -1,0 +1,9 @@
+
+            foo: function integer(x: integer, y: float, z:boolean) {
+                
+            }
+            main: function void() {
+                for (i = 0, i < 3, i + 1) {
+                    
+                }
+            }

@@ -1,0 +1,1 @@
+Type mismatch in statement: VarDecl(a, FloatType, FuncCall(foo, [IntegerLit(1), IntegerLit(2)]))

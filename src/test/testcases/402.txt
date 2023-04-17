@@ -1,0 +1,6 @@
+
+            main: function void() {
+                x, y, z: integer = 100, 90, 434;
+                t, u, y: float = 1.1, 1.1e2, 90;
+            }
+        
