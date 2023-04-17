@@ -1,4 +1,5 @@
-/src/test/solutions/*.txt
-/src/test/testcases/*.txt
+/src/test/solutions/*
+
+/src/test/testcases/*
+
 /target/*
-!/target
