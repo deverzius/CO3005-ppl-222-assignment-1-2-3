@@ -3,38 +3,15 @@ from StaticError import *
 from AST import *
 from functools import reduce
 
-# class Type(ABC):
-#     pass
-# class AtomicType(Type):
-#     pass
-# class IntegerType(AtomicType):
-#     pass
-# class FloatType(AtomicType):
-#     pass
-# class StringType(AtomicType):
-#     pass
-# class BooleanType(AtomicType):
-#     pass
-
-# class ArrayType(Type):
-#     def __init__(self, dimens: list[int], etyp: AtomicType):
-#         self.dimensions = dimens
-#         self.etyp = etyp
-
-# class FuncType(Type):
-#     pass
-
-# class VoidType(Type):
-#     pass
-# class AutoType(Type):
-#     def __init__(self, typ: Type or None = None):
-#         self.typ = typ
-#     pass
 
 class LoopStmt(Stmt):
     def __init__(self):
         self.name = "#loop"
     pass
+
+class UnknownType(AtomicType):
+    def __str__(self):
+        return self.__class__.__name__
 
 class Utils:
     @staticmethod
@@ -47,13 +24,13 @@ class Utils:
                     return decl.typ
         raise Undeclared(kind, name)
     
+    @staticmethod
     def getCtxByName(name, o):
         for env in o:
             for decl in env:
                 if name == decl.name:
                     return decl
         return None
-
 
     @staticmethod
     def getFunctionParams(ctx, o):
@@ -75,7 +52,7 @@ class Utils:
         #         if not Utils.isTypeCompatible(lhs.typ, rhs.typ):
         #             return False
         if type(lhs) is ArrayType and type(rhs) is ArrayType:
-            if not Utils.isTypeCompatible(lhs.typ, rhs.typ):
+            if not Utils.compareArrayType(lhs, rhs):
                 return False
         
         if type(lhs) is FloatType and type(rhs) is IntegerType:
@@ -84,26 +61,57 @@ class Utils:
             return True
         return False
     
-    
     @staticmethod
-    def isTypeEquivalent(lhs: Type, rhs: Type):
-        if type(lhs) is ArrayType and type(rhs) is ArrayType:
-            if not Utils.isTypeEquivalent(lhs.typ, rhs.typ):
+    def compareArrayType(at1, at2):
+        if not (type(at1.typ) is type(at2.typ)):
+            return False
+        
+        if len(at1.dimensions) != len(at2.dimensions):
+            return False
+                
+        for i in range(len(at1.dimensions)):
+            if at1.dimensions[i] != at2.dimensions[i]:
                 return False
+        
+        return True
+    
+    # @staticmethod
+    # def isTypeEquivalent(lhs: Type, rhs: Type):
+    #     if type(lhs) is ArrayType and type(rhs) is ArrayType:
+    #         if not Utils.isTypeEquivalent(lhs.typ, rhs.typ):
+    #             return False
 
-        if type(lhs) is type(rhs):
-            return True
-        return False
+    #     if type(lhs) is type(rhs):
+    #         return True
+    #     return False
     
     
     @staticmethod
-    def castingFunctionAutoType(name: str, o):
-        n = len(o)
-        for idx, fundecl in enumerate(o[n - 1]): 
+    def castFunctionAutoType(name: str, typ: Type, o):
+        for idx, fundecl in enumerate(o[-1]): 
             if fundecl.name == name:
-                o[n - 1][idx].return_type = Type
+                o[-1][idx].return_type = typ
                 break
         return o
+    
+    @staticmethod
+    def castParamAutoType(param_name: str, func_name: str, typ: Type, o):
+        for i, fundecl in enumerate(o[-1]): 
+            if fundecl.name == func_name:
+                for j, param in enumerate(fundecl.params):
+                    if param.name == param_name:
+                        o[-1][i].params[j].typ = typ
+        return o
+    
+    @staticmethod
+    def printObjectList(o):
+        print('=======================================')
+        for i, env in enumerate(o):
+            print('** Scope ' + str(i))
+            for decl in env:
+                print(decl.name + ' ' + str(type(decl.typ)) if decl.typ else str(type(decl.return_type)))
+            print('** End scope ' + str(i))
+        print('=======================================')
 
 class StaticChecker(Visitor):
     def __init__(self, ast):
@@ -127,11 +135,18 @@ class StaticChecker(Visitor):
         ltyp = self.visit(ctx.left, o)
         rtyp = self.visit(ctx.right, o)
         
+        if type(ltyp) is AutoType and type(ctx.left) is FuncCall:
+            o = Utils.castFunctionAutoType(ctx.left.name, rtyp, o)
+            ltyp = rtyp
+        
+        if type(rtyp) is AutoType and type(ctx.right) is FuncCall:
+            o = Utils.castFunctionAutoType(ctx.right.name, ltyp, o)
+            rtyp = ltyp
         
         if ctx.op in ['+', '-', '*', '/']:
             # if type(ltyp) is AutoType and type(rtyp) in [IntegerType, FloatType]:
             if type(ltyp) in [IntegerType, FloatType] and type(rtyp) in [IntegerType, FloatType]:
-                return FloatType() if type(ltyp) is FloatType() or type(rtyp) is FloatType else IntegerType()
+                return IntegerType() if (type(ltyp) is IntegerType and type(rtyp) is IntegerType) else FloatType()
             raise TypeMismatchInExpression(ctx)
         
         if ctx.op == '%':
@@ -148,6 +163,7 @@ class StaticChecker(Visitor):
             if type(ltyp) is StringType and type(rtyp) is StringType:
                 return StringType()
             raise TypeMismatchInExpression(ctx)
+        
         if ctx.op in ['==','!=']:
             if type(ltyp) is type(rtyp):
                 if type(ltyp) in [IntegerType, BooleanType]:
@@ -155,6 +171,8 @@ class StaticChecker(Visitor):
             raise TypeMismatchInExpression(ctx)
         
         if ctx.op in ['>','>=','<','<=']:
+            # if type(ltyp) is type(rtyp):
+            #     if type(ltyp) in [IntegerType, FloatType]:
             if type(ltyp) in [IntegerType, FloatType]:
                 if type(rtyp) in [IntegerType, FloatType]:
                     return BooleanType()
@@ -167,16 +185,22 @@ class StaticChecker(Visitor):
         if ctx.op == '!':
             if type(typ) is BooleanType:
                 return BooleanType()
+            if type(typ) is AutoType and type(ctx.val) is FuncCall:
+                o = Utils.castFunctionAutoType(ctx.val.name, BooleanType(), o)
+                return BooleanType()
         else:
             if type(typ) in [IntegerType, FloatType]:
                 return typ
+            if type(typ) is AutoType and type(ctx.val) is FuncCall:
+                o = Utils.castFunctionAutoType(ctx.val.name, IntegerType(), o)
+                return IntegerType()
         
         raise TypeMismatchInExpression(ctx)
     
     def visitId(self, ctx, o):
         for env in o:
             for decl in env:
-                if ctx.name == decl.name and type(decl) is VarDecl:
+                if ctx.name == decl.name and type(decl) is not FuncDecl:
                     return decl.typ
         raise Undeclared(Identifier(), ctx.name)
         
@@ -202,31 +226,66 @@ class StaticChecker(Visitor):
         return StringType()
     def visitBooleanLit(self, ctx, o): 
         return BooleanType()
-    def visitArrayLit(self, ctx, o): 
-        typ = None
+    
+    
+    def getArrayLitAtomicTyp(self, ctx, o):
+        if not hasattr(ctx, 'explist'):
+            return self.visit(ctx, o) 
+        if len(ctx.explist) == 0:
+            return UnknownType()
+        return self.getArrayLitAtomicTyp(ctx.explist[0], o)
+    
+    def getArrayLitType(self, ctx, atomictyp, root_ctx, o):
+        # atomic type
+        if not hasattr(ctx.explist[0], "explist"):
+            return ArrayType([len(ctx.explist)], atomictyp)
+        
+        curTyp = None
         for expr in ctx.explist:
-            curtyp = self.visit(expr, o)
-            if typ is None:
-                typ = curtyp
-            elif type(typ) != type(curtyp):
-                raise IllegalArrayLiteral(ctx)
+            exprTyp = self.getArrayLitType(expr, atomictyp, root_ctx, o)
+            
+            if curTyp is None:
+                curTyp = exprTyp
+            elif not Utils.compareArrayType(exprTyp, curTyp):
+                raise IllegalArrayLiteral(root_ctx)
         
-        # n-dimensional array lit
-        while hasattr(typ, "typ"):
-            typ = typ.typ
+        return ArrayType([len(ctx.explist)] + exprTyp.dimensions, atomictyp)
         
-        return ArrayType([IntegerLit(0)], typ)
+    def visitArrayLit(self, ctx, o):
+        atomictyp = self.getArrayLitAtomicTyp(ctx, o)
+        arrayType = self.getArrayLitType(ctx, atomictyp, ctx, o)
+        # print(arrayType)
+        return arrayType
+    
+    
     
     def visitFuncCall(self, ctx, o):
-        funCallTyp = Utils.getTypeByName(ctx.name, Function(), o)
-        # type(x) is ParamDecl
-        paramsTyp = [x.typ for x in Utils.getFunctionParams(ctx, o)]
+        params = Utils.getFunctionParams(ctx, o)
+        
+        # if len(ctx.args) < len(params):
+        #     raise TypeMismatchInExpression()
+        # if len(ctx.args) > len(params):
+        #     errIdx = len(params)
+        #     raise TypeMismatchInExpression(ctx.args[errIdx])
+        if len(ctx.args) != len(params):
+            raise TypeMismatchInExpression()
+        
+        paramsTypList = [x.typ for x in params]
         
         for i, arg in enumerate(ctx.args):
             argtyp = self.visit(arg, o)
             
-            if not Utils.isTypeEquivalent(paramsTyp[i], argtyp):
+            if type(paramsTypList[i]) is AutoType:
+                Utils.castParamAutoType(params[i].name, ctx.name, argtyp, o)
+                continue
+            
+            if not Utils.isTypeCompatible(paramsTypList[i], argtyp):
                 raise TypeMismatchInExpression(ctx)
+        
+        funCallTyp = Utils.getTypeByName(ctx.name, Function(), o)
+        if type(funCallTyp) is VoidType:
+            raise TypeMismatchInExpression(ctx)
+        # type(x) is ParamDecl
             
         return funCallTyp
 
@@ -238,6 +297,10 @@ class StaticChecker(Visitor):
         if type(ltyp) is VoidType or type(ltyp) is ArrayType:
             raise TypeMismatchInStatement(ctx)
         
+        if type(rtyp) is AutoType and type(ctx.rhs) is FuncCall:
+            o = Utils.castFunctionAutoType(ctx.rhs.name, ltyp, o)
+            return o
+
         if Utils.isTypeCompatible(ltyp, rtyp):
             return o
         raise TypeMismatchInStatement(ctx)
@@ -277,7 +340,11 @@ class StaticChecker(Visitor):
         if not (type(updtyp) is IntegerType):
             raise TypeMismatchInStatement(ctx)
         
-        env = self.visit(ctx.stmt, env)
+        if type(ctx.stmt) is BlockStmt:
+            for stmt in ctx.stmt.body:
+                env = self.visit(stmt, env)
+        else:
+            env = self.visit(ctx.stmt, env)
             
         return o
         
@@ -314,34 +381,29 @@ class StaticChecker(Visitor):
         raise MustInLoop(ctx)
     
     def visitReturnStmt(self, ctx, o):
-        if not ctx.expr:
-            return VoidType()
-        
+        # stmt duy nhat k return o
         returnStmtTyp = self.visit(ctx.expr, o)
-        
-        # function in o[1]
-        for decl in o[1]:
-            if hasattr(decl, 'return_type'):
-                funReturnType = decl.return_type
-                break
-        # if not Utils.isTypeCompatible(funReturnType, returnStmtTyp):
-        #     raise TypeMismatchInStatement(ctx)
-        
-        return o
-        
+        return returnStmtTyp
+
     def visitCallStmt(self, ctx, o):
         funTyp = Utils.getTypeByName(ctx.name, Function(), o)
-        if not type(funTyp) is VoidType:
-            raise TypeMismatchInStatement(ctx)
+        # if not type(funTyp) is VoidType:
+        #     raise TypeMismatchInStatement(ctx)
+        params = Utils.getFunctionParams(ctx, o)
+        paramsTypList = [x.typ for x in params]
         
-        paramsTyp = [self.visit(x, o).typ for x in Utils.getFunctionParams(ctx, o)]
+        if len(ctx.args) != len(params):
+            raise TypeMismatchInStatement()
         
         for i, arg in enumerate(ctx.args):
             argtyp = self.visit(arg, o)
-            if type(paramsTyp[i]) is FloatType and type(argtyp) is IntegerType:
-                return o
-            if type(argtyp) != type(paramsTyp[i]):
-                raise TypeMismatchInExpression(ctx)
+            
+            if type(paramsTypList[i]) is AutoType:
+                Utils.castParamAutoType(params[i].name, ctx.name, argtyp, o)
+                continue
+            
+            if not Utils.isTypeCompatible(argtyp, paramsTypList[i]):
+                raise TypeMismatchInStatement(ctx)
             
         return o
 
@@ -356,6 +418,9 @@ class StaticChecker(Visitor):
             
             if isinstance(ctx.typ, AutoType):
                 ctx.typ = initTyp
+            
+            elif type(initTyp) is AutoType and type(ctx.init) is FuncCall:
+                o = Utils.castFunctionAutoType(ctx.init.name, ctx.typ, o)
             
             elif not Utils.isTypeCompatible(ctx.typ, initTyp):
                 raise TypeMismatchInVarDecl(ctx)
@@ -398,8 +463,6 @@ class StaticChecker(Visitor):
                 
                 if type(firstStmt) is CallStmt and firstStmt.name == 'preventDefault':
                     raise InvalidStatementInFunction(ctx.name)
-                
-                env = self.visit(firstStmt, env) 
         
         else:
             if len(ctx.body.body) == 0:
@@ -412,6 +475,12 @@ class StaticChecker(Visitor):
                 # hàm cha không có tham số nhưng cố chấp gọi super
                 if len(inheritFunc.params) == 0:
                     raise InvalidStatementInFunction(ctx.name)
+                
+                if len(firstStmt.args) > len(inheritFunc.params):
+                    errIdx = len(inheritFunc.params)
+                    raise TypeMismatchInExpression(firstStmt.args[errIdx])
+                if len(firstStmt.args) < len(inheritFunc.params):
+                    raise TypeMismatchInExpression()
                     
                 for i, arg in enumerate(firstStmt.args):
                     argtyp = self.visit(arg, env)
@@ -425,14 +494,44 @@ class StaticChecker(Visitor):
             else:
                 raise InvalidStatementInFunction(ctx.name)
         
-        for stmt in ctx.body.body[1:]:
+        for stmt in ctx.body.body:
+            if type(stmt) is CallStmt:
+                if stmt.name == 'super' or stmt.name == 'preventDefault':
+                    continue
+            
+            if type(stmt) is ReturnStmt:
+                returnStmtTyp = self.visit(stmt, env)
+                
+                if type(ctx.return_type) is AutoType:
+                    Utils.castFunctionAutoType(ctx.name, returnStmtTyp, o)
+                    Utils.castFunctionAutoType(ctx.name, returnStmtTyp, env)
+                elif type(ctx.return_type) is not type(returnStmtTyp):
+                    raise TypeMismatchInStatement(stmt)
+                continue
+                
             env = self.visit(stmt, env) 
         
         return o
 
     def visitProgram(self, ctx, o):
         mainExist = False
-        o = [[]]
+        
+        o = [[
+            FuncDecl('readInteger', IntegerType(), [], None, BlockStmt([])),
+            FuncDecl('printInteger', VoidType(), [ParamDecl('anArg', IntegerType())], None, BlockStmt([])),
+            
+            FuncDecl('readFloat', FloatType(), [], None, BlockStmt([])),
+            FuncDecl('printFloat', VoidType(), [ParamDecl('anArg', FloatType())], None, BlockStmt([])),
+            
+            FuncDecl('readBoolean', BooleanType(), [], None, BlockStmt([])),
+            FuncDecl('printBoolean', VoidType(), [ParamDecl('anArg', BooleanType())], None, BlockStmt([])),
+            
+            FuncDecl('readString', StringType(), [], None, BlockStmt([])),
+            FuncDecl('printString', VoidType(), [ParamDecl('anArg', StringType())], None, BlockStmt([])),
+            
+            FuncDecl('super', VoidType(), [], None, BlockStmt([])),
+            FuncDecl('preventDefault', VoidType(), [], None, BlockStmt([])),
+        ]]
         
         # use function before declaration
         for decl in ctx.decls:
@@ -444,10 +543,14 @@ class StaticChecker(Visitor):
                     if fundecl.name == decl.name:
                         raise Redeclared(Function(), fundecl.name)
                 o[0] += [decl]
+
+        # print("======")
+        # for x in o[0]:
+        #     print(x.name)
+        # print("======")
         
-        if mainExist:
-            for decl in ctx.decls:
-                o = self.visit(decl, o)
-            return o
+        for decl in ctx.decls:
+            o = self.visit(decl, o)
         
-        raise NoEntryPoint()
+        if mainExist == False:
+            raise NoEntryPoint()
