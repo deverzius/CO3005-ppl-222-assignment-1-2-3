@@ -210,6 +210,9 @@ class StaticChecker(Visitor):
         if not hasattr(arrayTyp, 'dimensions'):
             raise TypeMismatchInExpression(ctx)
         
+        if len(ctx.cell) != len(arrayTyp.dimensions):
+            raise TypeMismatchInExpression(ctx)
+        
         for expr in ctx.cell:
             typ = self.visit(expr, o)
             if not type(typ) is IntegerType:
@@ -234,11 +237,11 @@ class StaticChecker(Visitor):
         if len(ctx.explist) == 0:
             return UnknownType()
         return self.getArrayLitAtomicTyp(ctx.explist[0], o)
-    
+            
     def getArrayLitType(self, ctx, atomictyp, root_ctx, o):
         # atomic type
-        if not hasattr(ctx.explist[0], "explist"):
-            return ArrayType([len(ctx.explist)], atomictyp)
+        if not hasattr(ctx, "explist"):
+            return self.visit(ctx, o)
         
         curTyp = None
         for expr in ctx.explist:
@@ -246,15 +249,24 @@ class StaticChecker(Visitor):
             
             if curTyp is None:
                 curTyp = exprTyp
-            elif not Utils.compareArrayType(exprTyp, curTyp):
+            elif not (type(curTyp) is type(exprTyp)):
                 raise IllegalArrayLiteral(root_ctx)
+            elif type(exprTyp) is ArrayType:
+                if not Utils.compareArrayType(exprTyp, curTyp):
+                    raise IllegalArrayLiteral(root_ctx)
         
-        return ArrayType([len(ctx.explist)] + exprTyp.dimensions, atomictyp)
+        return ArrayType(
+            [len(ctx.explist)] + exprTyp.dimensions if hasattr(exprTyp, 'dimensions')
+            else [len(ctx.explist)] 
+            , atomictyp)
         
     def visitArrayLit(self, ctx, o):
         atomictyp = self.getArrayLitAtomicTyp(ctx, o)
+        if type(atomictyp) is UnknownType:
+            return ArrayType([0], UnknownType())
+        
         arrayType = self.getArrayLitType(ctx, atomictyp, ctx, o)
-        # print(arrayType)
+        
         return arrayType
     
     
@@ -382,6 +394,9 @@ class StaticChecker(Visitor):
     
     def visitReturnStmt(self, ctx, o):
         # stmt duy nhat k return o
+        if ctx.expr is None:
+            return VoidType()
+        
         returnStmtTyp = self.visit(ctx.expr, o)
         return returnStmtTyp
 
@@ -440,11 +455,6 @@ class StaticChecker(Visitor):
         return ctx
         
     def visitFuncDecl(self, ctx, o):
-        # for decl in o[0]:
-        #     if decl.name == ctx.name:
-        #         raise Redeclared(Function(), ctx.name)
-        # o[0] += [ctx]
-        
         env = [[]] + o
         for param in ctx.params:
             env[0] += [self.visit(param, env)]
@@ -494,21 +504,26 @@ class StaticChecker(Visitor):
             else:
                 raise InvalidStatementInFunction(ctx.name)
         
+            
+        returnStmtVisited = False
         for stmt in ctx.body.body:
             if type(stmt) is CallStmt:
                 if stmt.name == 'super' or stmt.name == 'preventDefault':
                     continue
             
-            if type(stmt) is ReturnStmt:
+            if (not returnStmtVisited) and type(stmt) is ReturnStmt:
+                returnStmtVisited = True
                 returnStmtTyp = self.visit(stmt, env)
                 
                 if type(ctx.return_type) is AutoType:
                     Utils.castFunctionAutoType(ctx.name, returnStmtTyp, o)
                     Utils.castFunctionAutoType(ctx.name, returnStmtTyp, env)
-                elif type(ctx.return_type) is not type(returnStmtTyp):
+                elif not Utils.isTypeCompatible(ctx.return_type, returnStmtTyp):
                     raise TypeMismatchInStatement(stmt)
                 continue
-                
+            elif returnStmtVisited and type(stmt) is ReturnStmt:
+                continue
+            
             env = self.visit(stmt, env) 
         
         return o
