@@ -19,9 +19,10 @@ class Utils:
         for env in o:
             for decl in env:
                 if name == decl.name:
-                    if hasattr(decl, 'return_type'):
+                    if hasattr(decl, 'return_type') and type(kind) is Function:
                         return decl.return_type
-                    return decl.typ
+                    elif hasattr(decl, 'typ') and type(kind) is Identifier:
+                        return decl.typ
         raise Undeclared(kind, name)
     
     @staticmethod
@@ -96,6 +97,8 @@ class Utils:
     
     @staticmethod
     def castParamAutoType(param_name: str, func_name: str, typ: Type, o):
+        
+        
         for i, fundecl in enumerate(o[-1]): 
             if fundecl.name == func_name:
                 for j, param in enumerate(fundecl.params):
@@ -135,12 +138,18 @@ class StaticChecker(Visitor):
         ltyp = self.visit(ctx.left, o)
         rtyp = self.visit(ctx.right, o)
         
-        if type(ltyp) is AutoType and type(ctx.left) is FuncCall:
+        if type(ltyp) is AutoType and type(ctx.left) in [FuncCall, CallStmt]:
             o = Utils.castFunctionAutoType(ctx.left.name, rtyp, o)
             ltyp = rtyp
         
-        if type(rtyp) is AutoType and type(ctx.right) is FuncCall:
+        elif type(rtyp) is AutoType and type(ctx.right) in [FuncCall, CallStmt]:
             o = Utils.castFunctionAutoType(ctx.right.name, ltyp, o)
+            rtyp = ltyp
+        
+        elif type(ltyp) is AutoType and type(ctx.left) is Id:
+            ltyp = rtyp
+        
+        elif type(rtyp) is AutoType and type(ctx.right) is Id:
             rtyp = ltyp
         
         if ctx.op in ['+', '-', '*', '/']:
@@ -185,14 +194,18 @@ class StaticChecker(Visitor):
         if ctx.op == '!':
             if type(typ) is BooleanType:
                 return BooleanType()
-            if type(typ) is AutoType and type(ctx.val) is FuncCall:
+            if type(typ) is AutoType and type(ctx.val) in [FuncCall, CallStmt]:
                 o = Utils.castFunctionAutoType(ctx.val.name, BooleanType(), o)
+                return BooleanType()
+            if type(typ) is AutoType and type(ctx.val) is Id:
                 return BooleanType()
         else:
             if type(typ) in [IntegerType, FloatType]:
                 return typ
-            if type(typ) is AutoType and type(ctx.val) is FuncCall:
+            if type(typ) is AutoType and type(ctx.val) in [FuncCall, CallStmt]:
                 o = Utils.castFunctionAutoType(ctx.val.name, IntegerType(), o)
+                return IntegerType()
+            if type(typ) is AutoType and type(ctx.val) is Id:
                 return IntegerType()
         
         raise TypeMismatchInExpression(ctx)
@@ -280,7 +293,7 @@ class StaticChecker(Visitor):
         #     errIdx = len(params)
         #     raise TypeMismatchInExpression(ctx.args[errIdx])
         if len(ctx.args) != len(params):
-            raise TypeMismatchInExpression()
+            raise TypeMismatchInExpression(ctx)
         
         paramsTypList = [x.typ for x in params]
         
@@ -395,10 +408,10 @@ class StaticChecker(Visitor):
     def visitReturnStmt(self, ctx, o):
         # stmt duy nhat k return o
         if ctx.expr is None:
-            return VoidType()
+            return o
         
         returnStmtTyp = self.visit(ctx.expr, o)
-        return returnStmtTyp
+        return o
 
     def visitCallStmt(self, ctx, o):
         funTyp = Utils.getTypeByName(ctx.name, Function(), o)
@@ -408,7 +421,7 @@ class StaticChecker(Visitor):
         paramsTypList = [x.typ for x in params]
         
         if len(ctx.args) != len(params):
-            raise TypeMismatchInStatement()
+            raise TypeMismatchInStatement(ctx)
         
         for i, arg in enumerate(ctx.args):
             argtyp = self.visit(arg, o)
@@ -417,7 +430,7 @@ class StaticChecker(Visitor):
                 Utils.castParamAutoType(params[i].name, ctx.name, argtyp, o)
                 continue
             
-            if not Utils.isTypeCompatible(argtyp, paramsTypList[i]):
+            if not Utils.isTypeCompatible(paramsTypList[i], argtyp):
                 raise TypeMismatchInStatement(ctx)
             
         return o
@@ -483,21 +496,34 @@ class StaticChecker(Visitor):
             
             if type(firstStmt) is CallStmt and firstStmt.name == 'super':
                 # hàm cha không có tham số nhưng cố chấp gọi super
-                if len(inheritFunc.params) == 0:
+                
+                # if len(firstStmt.args) > len(inheritFunc.params):
+                #     errIdx = len(inheritFunc.params)
+                #     raise TypeMismatchInExpression(firstStmt.args[errIdx])
+                # if len(firstStmt.args) < len(inheritFunc.params):
+                #     raise TypeMismatchInExpression()
+                
+                inheritParams = []
+                for param in inheritFunc.params:
+                    if param.inherit == True:
+                        inheritParams += [param]
+                
+                if len(inheritParams) == 0:
                     raise InvalidStatementInFunction(ctx.name)
                 
-                if len(firstStmt.args) > len(inheritFunc.params):
-                    errIdx = len(inheritFunc.params)
-                    raise TypeMismatchInExpression(firstStmt.args[errIdx])
-                if len(firstStmt.args) < len(inheritFunc.params):
-                    raise TypeMismatchInExpression()
-                    
                 for i, arg in enumerate(firstStmt.args):
                     argtyp = self.visit(arg, env)
-                    if type(argtyp) is not type(inheritFunc.params[i].typ):
+                    
+                    if i >= len(inheritParams):
+                        raise TypeMismatchInExpression(firstStmt.args[i])
+                    
+                    if type(argtyp) is not type(inheritParams[i].typ):
                         raise TypeMismatchInExpression(arg)
                     
-                    env[0] += [self.visit(inheritFunc.params[i], env)]
+                    env[0] += [self.visit(inheritParams[i], env)]
+                    
+                if len(inheritParams) > len(firstStmt.args):
+                    raise TypeMismatchInExpression()
             
             elif type(firstStmt) is CallStmt and firstStmt.name == 'preventDefault':
                 pass
@@ -513,7 +539,10 @@ class StaticChecker(Visitor):
             
             if (not returnStmtVisited) and type(stmt) is ReturnStmt:
                 returnStmtVisited = True
-                returnStmtTyp = self.visit(stmt, env)
+                if stmt.expr is None:
+                    returnStmtTyp = VoidType()
+                else:
+                    returnStmtTyp = self.visit(stmt.expr, env)
                 
                 if type(ctx.return_type) is AutoType:
                     Utils.castFunctionAutoType(ctx.name, returnStmtTyp, o)

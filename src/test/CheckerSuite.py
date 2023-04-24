@@ -272,7 +272,7 @@ class CheckerSuite(unittest.TestCase):
             main: function void() {
                 arr[3] = 5;
             }"""
-        expect = """Type mismatch in expression: ArrayCell(arr, [IntegerLit(3)])"""
+        expect = """Undeclared Identifier: arr"""
         self.assertTrue(TestChecker.test(input, expect, 420))
     
     def test_type_mismatch_3(self):
@@ -481,7 +481,7 @@ class CheckerSuite(unittest.TestCase):
                 x: integer = foo1(true, "I cant sleep") + 20;
                 return 123;
             }"""
-        expect = """Type mismatch in expression: """
+        expect = """Type mismatch in expression: FuncCall(foo1, [BooleanLit(True), StringLit(I cant sleep)])"""
         self.assertTrue(TestChecker.test(input, expect, 433))
     
     def test_type_mismatch_17(self):
@@ -634,7 +634,7 @@ class CheckerSuite(unittest.TestCase):
             main: function void() {
                 foo(123, true);
             }"""
-        expect = """Type mismatch in statement: """
+        expect = """Type mismatch in statement: CallStmt(foo, IntegerLit(123), BooleanLit(True))"""
         self.assertTrue(TestChecker.test(input, expect, 444))
     
     def test_type_mismatch_29(self):
@@ -647,7 +647,7 @@ class CheckerSuite(unittest.TestCase):
             main: function void() {
                 foo(123, true, "abcdefg", false);
             }"""
-        expect = """Type mismatch in statement: """
+        expect = """Type mismatch in statement: CallStmt(foo, IntegerLit(123), BooleanLit(True), StringLit(abcdefg), BooleanLit(False))"""
         self.assertTrue(TestChecker.test(input, expect, 445))
     
     def test_type_mismatch_30(self):
@@ -930,12 +930,12 @@ class CheckerSuite(unittest.TestCase):
         
             main: function void() {
             }"""
-        expect = """Type mismatch in expression: """
+        expect = """Invalid statement in function: foo"""
         self.assertTrue(TestChecker.test(input, expect, 465))
     
     def test_invalid_first_statement_5(self):
         input = """
-            f1: function void (x: integer) {
+            f1: function void (inherit x: integer) {
             }
             
             foo: function auto() inherit f1 {
@@ -1163,7 +1163,7 @@ class CheckerSuite(unittest.TestCase):
     
     def test_mix_8(self):
         input = """
-            foo1: function auto(x: array[4] of float, y: string) {
+            foo1: function auto(inherit x: array[4] of float, inherit y: string) {
                 z: boolean;
                 return z;
             }
@@ -1184,7 +1184,7 @@ class CheckerSuite(unittest.TestCase):
     
     def test_mix_9(self):
         input = """
-            foo1: function auto(x: array[4] of float, y: string) {
+            foo1: function auto(inherit x: array[4] of float, y: string) {
                 z: boolean;
                 return z;
             }
@@ -1200,7 +1200,7 @@ class CheckerSuite(unittest.TestCase):
             }
             
         """
-        expect = """"""
+        expect = """Type mismatch in expression: StringLit(abc)"""
         self.assertTrue(TestChecker.test(input, expect, 480))
     
     
@@ -1505,3 +1505,131 @@ class CheckerSuite(unittest.TestCase):
             }"""
         expect = """"""
         self.assertTrue(TestChecker.test(input, expect, 495))
+    
+    def test_mix_25(self):
+        input = """
+            foo1: function float() {
+                return 1.5;
+            }
+            foo2: function integer(x: boolean) {
+                if (x) {
+                    while(x) {
+                        printBoolean(x);
+                        do {
+                            printString("abc");
+                        }
+                        while ((true == false) && (456 >= 9));
+                    }
+                }
+                return foo2(false);
+            }
+            main: function void() {
+                y: float = foo1() / foo2(false);
+            }"""
+        expect = """"""
+        self.assertTrue(TestChecker.test(input, expect, 496))
+    
+    def test_mix_26(self):
+        input = """
+            foo1: function auto() {
+                return 1.e5;
+            }
+            foo2: function boolean(x: boolean) {
+                if (x) {
+                    while(x) {
+                        printBoolean(x);
+                        do {
+                            printString("abc");
+                        }
+                        while ((true == false) && (456 >= 9));
+                    }
+                }
+                return foo2(false);
+            }
+            main: function void() {
+                y: float = foo1() / foo2(foo2(foo2(foo2(true))));
+            }"""
+        expect = """Type mismatch in expression: BinExpr(/, FuncCall(foo1, []), FuncCall(foo2, [FuncCall(foo2, [FuncCall(foo2, [FuncCall(foo2, [BooleanLit(True)])])])]))"""
+        self.assertTrue(TestChecker.test(input, expect, 497))
+    
+    
+    def test_mix_27(self):
+        input = """
+            foo1: function auto() {
+                return 1.e5;
+            }
+            foo2: function boolean(x: boolean) {
+                if (x) {
+                    while(x) {
+                        printBoolean(x);
+                        do {
+                            printString("abc");
+                        }
+                        while ((true == false) && (456 >= 9));
+                    }
+                }
+                return foo2(false);
+            }
+            main: function void(u: integer) {
+            }"""
+        expect = """No entry point"""
+        self.assertTrue(TestChecker.test(input, expect, 498))
+    
+    def test_mix_28(self):
+        input = """
+            foo2: function boolean(x: boolean) {
+                if (x) {
+                    while(x) {
+                        printBoolean(x);
+                        do {
+                            printString("abc");
+                        }
+                        while ((true == false) && (456 >= 9));
+                    }
+                }
+                return foo2(false);
+            }
+            main: function void() {
+                arr: array[3,3] of boolean = {
+                    {true, false, true},
+                    // error: {false}
+                    {true, {false}, foo2(false)},
+                    {true, foo2(foo2(true)), true}
+                };
+            }"""
+        expect = """Illegal array literal: ArrayLit([ArrayLit([BooleanLit(True), BooleanLit(False), BooleanLit(True)]), ArrayLit([BooleanLit(True), ArrayLit([BooleanLit(False)]), FuncCall(foo2, [BooleanLit(False)])]), ArrayLit([BooleanLit(True), FuncCall(foo2, [FuncCall(foo2, [BooleanLit(True)])]), BooleanLit(True)])])"""
+        self.assertTrue(TestChecker.test(input, expect, 499))
+    
+    def test_mix_29(self):
+        input = """
+            z: integer = foo1("abc") + 1;
+            
+            foo1: function auto(s: string) {
+                for (z = 4, z == 0, z - 1) {
+                    z = z / 9 % 6;
+                }
+            }
+        
+            foo2: function auto(x: boolean) {
+                if (x) {
+                    while(x) {
+                        printBoolean(x);
+                        do {
+                            printString("abc");
+                        }
+                        while ((true == false) && (456 >= 9));
+                    }
+                }
+                return foo2(false) || true;
+            }
+            main: function void() {
+                arr: array[3,3] of boolean = {
+                    {true, false, true},
+                    {true, false, foo2(false)},
+                    {true, foo2(foo2(true)), true}
+                };
+                
+                check: boolean = z && foo1("abs");
+            }"""
+        expect = """Type mismatch in expression: BinExpr(&&, Id(z), FuncCall(foo1, [StringLit(abs)]))"""
+        self.assertTrue(TestChecker.test(input, expect, 500))
